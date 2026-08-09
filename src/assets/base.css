@@ -1,0 +1,47 @@
+/* Vuetify's own `vuetify/styles` import already provides a full reset and
+   base typography scoped to `.v-application` — this file only adds what
+   Vuetify doesn't: the brand typefaces and a couple of shared data-grid
+   utility classes reused across the table and the virtual-scroll list. */
+
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap');
+
+.v-application {
+  font-family: 'Barlow', sans-serif !important;
+}
+
+/* Vuetify's heading/title classes and component titles read better in the
+   condensed brand face — same pairing rationale as the Angular build
+   (Barlow Semi Condensed is the closest open match to the logo's Klavika
+   wordmark; Barlow at standard width for body/data). */
+.text-h1,
+.text-h2,
+.text-h3,
+.text-h4,
+.text-h5,
+.text-h6,
+.v-toolbar-title,
+.v-card-title,
+.v-list-item-title {
+  font-family: 'Barlow Semi Condensed', sans-serif !important;
+}
+
+/* Shared data-grid utilities — used by both the paged table and the
+   virtual-scroll list. */
+.numeric-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+
+  &[data-level='low'] {
+    color: rgb(var(--v-theme-warning));
+    font-weight: 600;
+  }
+
+  &[data-level='out'] {
+    color: rgb(var(--v-theme-error));
+    font-weight: 600;
+  }
+}
