@@ -7,7 +7,8 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Parts Manager', icon: 'mdi-package-variant-closed', to: '/parts' },
+  { label: 'API Explorer', icon: 'mdi-earth', to: '/api-explorer' },
+  { label: 'Parts Manager', icon: 'mdi-package-variant-closed', to: '/stress-test' },
   { label: 'Suppliers', icon: 'mdi-truck-outline', disabled: true },
   { label: 'Reports', icon: 'mdi-chart-line', disabled: true },
 ]

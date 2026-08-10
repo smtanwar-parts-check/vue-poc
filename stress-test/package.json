@@ -1,0 +1,14 @@
+{
+  "name": "vue-stress-test",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node stress-test.js",
+    "dashboard": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "puppeteer": "^23.0.0"
+  }
+}

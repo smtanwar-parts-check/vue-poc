@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import PartsFilterBar from './PartsFilterBar.vue'
 import PartsTable from './PartsTable.vue'
 import PartsVirtualList from './PartsVirtualList.vue'
 import PartFormDialog from './PartFormDialog.vue'
 import ConfirmDialog from '@/shared/ConfirmDialog.vue'
+import AlertDialog from '@/shared/AlertDialog.vue'
 import { useNotifications } from '@/shared/useNotifications'
 import { usePartsStore } from './usePartsStore'
 import type { Part } from './types'
@@ -14,6 +15,19 @@ type ViewMode = 'paged' | 'virtual'
 const store = usePartsStore()
 const notifications = useNotifications()
 const viewMode = ref<ViewMode>('paged')
+
+// Fires once per fresh failure (loadError only changes value when the
+// resource transitions between error states) rather than on every reactive
+// recheck, so switching to this tab with json-server down surfaces an
+// immediate, unmissable prompt instead of just the inline table error.
+// v-dialog stays non-blocking (unlike a native alert(), which would halt JS
+// synchronously — the exact freeze verified and avoided on the Angular side).
+const alertDialogOpen = ref(false)
+watch(store.loadError, (error) => {
+  if (error) {
+    alertDialogOpen.value = true
+  }
+})
 
 const formDialogOpen = ref(false)
 const editingPart = ref<Part | undefined>(undefined)
@@ -101,6 +115,15 @@ async function confirmDelete(): Promise<void> {
       @update:model-value="!$event && (partPendingDelete = null)"
       @confirm="confirmDelete"
       @cancel="partPendingDelete = null"
+    />
+
+    <AlertDialog
+      v-model="alertDialogOpen"
+      title="Local API unavailable"
+      message="Please start json server.
+
+Run this command:
+json-server --watch parts.json --port 8000"
     />
   </div>
 </template>

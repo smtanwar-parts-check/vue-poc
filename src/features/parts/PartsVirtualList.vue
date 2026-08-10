@@ -5,58 +5,33 @@ import { useVirtualList } from '@/composables/useVirtualList'
 import { stockLevel } from './stockLevel'
 import type { Part } from './types'
 
-const CHUNK_SIZE = 200
-/** Start fetching the next chunk once the viewport is this many rows from the end of what's loaded. */
-const PREFETCH_BUFFER = 150
 const ROW_HEIGHT = 48
 
 const items = ref<Part[]>([])
-const total = ref<number | null>(null)
-const loadingMore = ref(false)
-const initialLoading = ref(true)
+const loading = ref(true)
 const loadError = ref<string | null>(null)
-let nextPage = 1
 
-const { totalHeight, visibleItems, endIndex, onScroll, setViewportHeight } = useVirtualList(
-  items,
-  ROW_HEIGHT,
-)
+const { totalHeight, visibleItems, onScroll, setViewportHeight } = useVirtualList(items, ROW_HEIGHT)
 
 const viewportRef = ref<HTMLElement | null>(null)
 
-async function loadNextChunk(): Promise<void> {
-  const knownTotal = total.value
-  if (loadingMore.value || (knownTotal !== null && items.value.length >= knownTotal)) {
-    return
-  }
-
-  loadingMore.value = true
+// All 5,000 rows are fetched once, in a single request. The point being
+// demonstrated is DOM efficiency (only visibleItems ever renders), not
+// network efficiency, so there's deliberately no further fetching tied to
+// scroll position.
+async function loadAll(): Promise<void> {
+  loading.value = true
   loadError.value = null
   try {
-    const url = new URL(`${API_BASE_URL}/partsBulk`)
-    url.searchParams.set('_page', String(nextPage))
-    url.searchParams.set('_limit', String(CHUNK_SIZE))
-    const response = await fetch(url.toString())
+    const response = await fetch(`${API_BASE_URL}/partsBulk`)
     if (!response.ok) {
       throw new Error(`Request failed with ${response.status}`)
     }
-    const totalCount = Number(response.headers.get('X-Total-Count') ?? 0)
-    total.value = totalCount
-    const page = (await response.json()) as Part[]
-    items.value = [...items.value, ...page]
-    nextPage += 1
+    items.value = (await response.json()) as Part[]
   } catch {
-    loadError.value = 'Could not load more parts. Is json-server running?'
+    loadError.value = 'Could not load the bulk dataset. Is json-server running?'
   } finally {
-    loadingMore.value = false
-    initialLoading.value = false
-  }
-}
-
-function onScrollWithPrefetch(event: Event): void {
-  onScroll(event)
-  if (endIndex.value + PREFETCH_BUFFER >= items.value.length) {
-    void loadNextChunk()
+    loading.value = false
   }
 }
 
@@ -66,19 +41,18 @@ onMounted(() => {
   }
   const onResize = () => viewportRef.value && setViewportHeight(viewportRef.value.clientHeight)
   window.addEventListener('resize', onResize)
-  void loadNextChunk()
+  void loadAll()
 })
 </script>
 
 <template>
   <div class="virtual-list">
     <div class="virtual-list__meta">
-      <span>{{ items.length.toLocaleString() }} of {{ total !== null ? total.toLocaleString() : '…' }} rows loaded</span>
-      <span v-if="loadingMore" class="virtual-list__loading-label">· loading more…</span>
+      <span>{{ items.length.toLocaleString() }} rows loaded in one request</span>
     </div>
 
     <div class="virtual-list__progress">
-      <v-progress-linear v-if="initialLoading" indeterminate color="primary" />
+      <v-progress-linear v-if="loading" indeterminate color="primary" />
     </div>
 
     <p v-if="loadError" class="virtual-list__error">{{ loadError }}</p>
@@ -93,7 +67,7 @@ onMounted(() => {
         <span class="col-active">Status</span>
       </div>
 
-      <div ref="viewportRef" class="virtual-list__viewport" @scroll="onScrollWithPrefetch">
+      <div ref="viewportRef" class="virtual-list__viewport" @scroll="onScroll">
         <div class="virtual-list__spacer" :style="{ height: `${totalHeight}px` }">
           <div
             v-for="row in visibleItems"
@@ -135,10 +109,6 @@ onMounted(() => {
   gap: 4px;
   color: rgba(var(--v-theme-on-surface), 0.6);
   font-variant-numeric: tabular-nums;
-}
-
-.virtual-list__loading-label {
-  color: rgb(var(--v-theme-primary));
 }
 
 .virtual-list__progress {

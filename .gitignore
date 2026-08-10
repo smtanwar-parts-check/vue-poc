@@ -37,3 +37,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Stress-test tool — generated output, not source
+/stress-test/report.html

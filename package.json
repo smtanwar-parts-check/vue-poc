@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "start": "concurrently -n api,app -c yellow,cyan \"npm:api\" \"npm:dev\"",
-    "api": "json-server --watch parts.json --port 4000",
+    "api": "json-server --watch parts.json --port 8000",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test": "vitest run",

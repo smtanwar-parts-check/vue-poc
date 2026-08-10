@@ -40,7 +40,9 @@ const partsResource = useResource<Part[]>(
 const parts = computed(() => partsResource.value.value ?? [])
 const loading = computed(() => partsResource.isLoading.value)
 const loadError = computed(() =>
-  partsResource.error.value ? 'Could not reach the parts API. Is json-server running?' : null,
+  partsResource.error.value
+    ? 'Could not reach the parts API. Please start json server: json-server --watch parts.json --port 8000'
+    : null,
 )
 const isEmpty = computed(() => !loading.value && !loadError.value && parts.value.length === 0)
 const total = computed(() => {

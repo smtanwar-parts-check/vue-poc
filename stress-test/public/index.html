@@ -1,0 +1,128 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Vue bake-off — benchmarks dashboard</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; max-width: 780px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 16px; margin-top: 40px; }
+  section { border: 1px solid #ddd; border-radius: 10px; padding: 16px 20px; margin-top: 16px; }
+  button { font: inherit; padding: 8px 16px; border-radius: 6px; border: 1px solid #41b883; background: #41b883; color: white; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .status { margin-top: 10px; color: #555; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 13px; }
+  th, td { border: 1px solid #ddd; padding: 5px 10px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  .summary { background: #f6f6f6; padding: 10px 14px; border-radius: 8px; margin-top: 12px; font-size: 13px; }
+  .summary div { margin: 3px 0; }
+  .error { color: #b3261e; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h1>Vue bake-off — benchmarks dashboard</h1>
+  <p>Runs against the real, already-running app at <code>http://localhost:7000</code>. Nothing here is part of the Vue app's own source — this is a separate local tool, independent of the Angular dashboard.</p>
+
+  <section>
+    <h2>Bundle size</h2>
+    <p>Runs <code>npm run build</code> in <code>frontend-poc-vue</code>, then measures the real output files.</p>
+    <button id="build-btn">Run build</button>
+    <div class="status" id="build-status"></div>
+    <div id="build-result"></div>
+  </section>
+
+  <section>
+    <h2>Stress test</h2>
+    <p>Repeats a fixed interaction cycle 25 times against the running app, tracking heap/DOM/listener growth. Takes roughly 2 minutes.</p>
+    <button id="stress-btn">Run stress test</button>
+    <div class="status" id="stress-status"></div>
+    <div id="stress-result"></div>
+  </section>
+
+  <script>
+    function bytes(n) {
+      return (n / 1024).toFixed(1) + ' KB';
+    }
+    function pct(a, b) {
+      return a ? (((b - a) / a) * 100).toFixed(1) + '%' : 'n/a';
+    }
+
+    const buildBtn = document.getElementById('build-btn');
+    const buildStatus = document.getElementById('build-status');
+    const buildResult = document.getElementById('build-result');
+
+    buildBtn.addEventListener('click', async () => {
+      buildBtn.disabled = true;
+      buildStatus.textContent = 'Running vite build (+ type-check)… this usually takes 10–20 seconds.';
+      buildResult.innerHTML = '';
+      try {
+        const res = await fetch('/build', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Build failed');
+
+        buildStatus.textContent = `Done in ${(data.durationMs / 1000).toFixed(1)}s — ${data.timestamp}`;
+        const rows = data.rows
+          .map((r) => `<tr><td>${r.file}</td><td>${r.type}</td><td>${bytes(r.raw)}</td><td>${bytes(r.gzip)}</td></tr>`)
+          .join('');
+        buildResult.innerHTML = `
+          <div class="summary">
+            <div><strong>Initial bundle (raw):</strong> ${bytes(data.initialRaw)}</div>
+            <div><strong>Initial bundle (gzip):</strong> ${bytes(data.initialGzip)}</div>
+          </div>
+          <table>
+            <tr><th>File</th><th>Type</th><th>Raw</th><th>Gzip</th></tr>
+            ${rows}
+          </table>`;
+      } catch (err) {
+        buildStatus.innerHTML = `<span class="error">${err.message}</span>`;
+      } finally {
+        buildBtn.disabled = false;
+      }
+    });
+
+    const stressBtn = document.getElementById('stress-btn');
+    const stressStatus = document.getElementById('stress-status');
+    const stressResult = document.getElementById('stress-result');
+
+    stressBtn.addEventListener('click', async () => {
+      stressBtn.disabled = true;
+      stressStatus.textContent = 'Running 25 cycles… this takes about 2 minutes. Leave this tab open.';
+      stressResult.innerHTML = '';
+      try {
+        const res = await fetch('/stress-test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cycles: 25 }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Stress test failed');
+
+        const first = data.samples[1] ?? data.samples[0];
+        const last = data.samples[data.samples.length - 1];
+        stressStatus.textContent = `Done — ${data.timestamp}`;
+        const rows = data.samples
+          .map(
+            (s, i) =>
+              `<tr><td>${i}</td><td>${i === 0 ? '–' : data.durations[i - 1] + 'ms'}</td><td>${s.heapMB} MB</td><td>${s.nodes}</td><td>${s.listeners}</td></tr>`,
+          )
+          .join('');
+        stressResult.innerHTML = `
+          <div class="summary">
+            <div><strong>Heap used:</strong> ${first.heapMB}MB → ${last.heapMB}MB (${pct(first.heapMB, last.heapMB)})</div>
+            <div><strong>DOM nodes:</strong> ${first.nodes} → ${last.nodes} (${pct(first.nodes, last.nodes)})</div>
+            <div><strong>JS listeners:</strong> ${first.listeners} → ${last.listeners} (${pct(first.listeners, last.listeners)})</div>
+            <div><strong>Cycle time:</strong> ${data.durations[0]}ms (first) → ${data.durations[data.durations.length - 1]}ms (last)</div>
+          </div>
+          <table>
+            <tr><th>Cycle</th><th>Duration</th><th>Heap used</th><th>DOM nodes</th><th>JS listeners</th></tr>
+            ${rows}
+          </table>`;
+      } catch (err) {
+        stressStatus.innerHTML = `<span class="error">${err.message}</span>`;
+      } finally {
+        stressBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

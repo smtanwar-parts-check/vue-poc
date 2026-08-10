@@ -2,7 +2,10 @@
 
 Vue entry in the PartsCheck front-end stack bake-off — the same Parts CRUD screen (table + form)
 built against the same shared mock REST API as the Angular entry, using the same data, same
-branding, same acceptance criteria.
+branding, same acceptance criteria. The app has two independent views (see sidebar): an
+**API Explorer** (default) against the public `api.restful-api.dev` sandbox, and the original
+**Parts Manager** (now at `/stress-test`) against local json-server, kept as the target for future
+stress-testing since it isn't rate-limited.
 
 **Stack:** Vue 3.5 (Composition API, `<script setup>`, `defineModel()`), Vuetify 4, VeeValidate +
 Zod, a from-scratch virtual-scroll list built on plain Vue reactivity, json-server as the mock API.
@@ -20,7 +23,7 @@ npm install
 
 ## 2. Run the app
 
-One command starts both the mock API (json-server, port 4000) and the Vite dev server (port 5173)
+One command starts both the mock API (json-server, port 8000) and the Vite dev server (port 7000)
 together:
 
 ```bash
@@ -30,7 +33,7 @@ npm start
 Then open:
 
 ```
-http://localhost:5173
+http://localhost:7000
 ```
 
 To run them separately in two terminals:
@@ -45,7 +48,23 @@ npm run dev
 
 ## What you'll see
 
-The **Parts Manager** screen: a paginated, sortable, filterable data table (Vuetify's
+### API Explorer (`/api-explorer`, default)
+
+A generic object explorer against the public `https://api.restful-api.dev/objects` sandbox — a
+real external API, not our mock. This endpoint's pre-seeded data is generic consumer electronics
+(phones, laptops, etc.) with an arbitrary `data` field that varies per object — so rather than
+forcing a car-parts costume onto it, this view shows the data honestly: search/sort/paginate over
+the object list, and an add/edit dialog with a free-form key/value row editor for `data`.
+
+Because it's a public, shared, rate-limited (50 requests/day unauthenticated) sandbox: other
+people's test objects may appear alongside yours, and the note at the top of the screen calls this
+out. `GET /objects` is also a static seed snapshot that never reflects writes (verified directly
+against the live API) — creates/edits/deletes succeed for real, but this page tracks your own
+changes locally for the session rather than relying on a refetch that would never show them.
+
+### Parts Manager — stress test (`/stress-test`)
+
+The original **Parts Manager** screen: a paginated, sortable, filterable data table (Vuetify's
 `v-data-table-server`), with:
 
 - Add/Edit via a modal dialog — VeeValidate + Zod schema validation, including an async
@@ -69,10 +88,11 @@ second, independent view browsing a separate 5,000-row synthetic dataset (`parts
 
 Unlike the Angular build (which uses Angular CDK's virtual scroll), this is a **from-scratch
 implementation built entirely on Vue's own reactivity** (`ref`/`computed`) — no virtual-scroll
-library. Only the rows in the current visible window are ever rendered; Vue's own keyed `v-for`
-diffing reuses existing DOM elements for rows that stay in view across a scroll, rather than
-recreating them. Data loads incrementally in 200-row chunks as you scroll near the edge of what's
-already fetched.
+library. All 5,000 rows are fetched once, in a single request, when the view opens; only the rows
+in the current visible window are ever rendered, and Vue's own keyed `v-for` diffing reuses
+existing DOM elements for rows that stay in view across a scroll rather than recreating them —
+scroll down and watch the row count in dev tools stay flat while the Network tab stays quiet. This
+demo is about DOM efficiency, not network efficiency.
 
 This view is read-only — it exists to demonstrate the mechanism, not to duplicate the CRUD screen.
 
@@ -114,7 +134,8 @@ dev-only tooling standing in for a real backend.
 src/
   core/
     api/partsApi.ts       Data-access layer — the only thing that calls fetch() for parts
-    config.ts              API_BASE_URL
+    api/apiObjectsApi.ts   Data-access layer for the restful-api.dev objects endpoint
+    config.ts              API_BASE_URL, REMOTE_API_BASE_URL
   composables/
     useResource.ts          Vue's answer to Angular's httpResource() — reactive fetch, zero deps
     useVirtualList.ts        The from-scratch virtual-scroll engine
@@ -124,13 +145,19 @@ src/
   shared/
     useNotifications.ts       Singleton toast composable
     ConfirmDialog.vue          Reusable confirm/cancel dialog
+    AlertDialog.vue            Single-button "must acknowledge" dialog (non-blocking, unlike a native alert())
   features/parts/
     types.ts                    Part/PartInput/PartCategory
     usePartsQuery.ts              Pure query-param builder (mirrors the Angular parts-query.ts)
     usePartsStore.ts               Module-level singleton composable — the "store" without Pinia
     stockLevel.ts                   Pure out/low/ok classifier
-    PartsManagerPage.vue             Smart container — owns dialog state, view-mode toggle
+    PartsManagerPage.vue             Smart container for the /stress-test screen — dialog state, view-mode toggle
     PartsTable.vue, PartsFilterBar.vue, PartFormDialog.vue, SupplierTypeahead.vue, PartsVirtualList.vue
+  features/api-explorer/
+    useApiObjectsStore.ts           Fetches restful-api.dev once, filters/sorts/paginates client-side,
+                                     applies mutation responses to local state directly (see note above)
+    ApiExplorerPage.vue              Smart container for the /api-explorer screen
+    ApiObjectsTable.vue, ApiObjectFormDialog.vue
 scripts/
   generate-bulk-parts.cjs   Generates the synthetic partsBulk dataset (CommonJS — this project
                             uses "type": "module", so the .cjs extension is required)
@@ -156,10 +183,10 @@ parts.json                 Mock API data — identical to the Angular build's, f
 
 ## Troubleshooting
 
-**Port 5173 or 4000 already in use** — a previous `npm start` may not have shut down cleanly:
+**Port 7000 or 8000 already in use** — a previous `npm start` may not have shut down cleanly:
 
 ```bash
-npx kill-port 5173 4000
+npx kill-port 7000 8000
 ```
 
 **"Outdated Optimize Dep" / 504 errors right after starting the dev server** — a normal, one-time

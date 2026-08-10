@@ -3,12 +3,18 @@ import { createRouter, createWebHistory } from 'vue-router'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', redirect: '/parts' },
+    { path: '/', redirect: '/api-explorer' },
     {
-      path: '/parts',
-      name: 'parts',
+      path: '/api-explorer',
+      name: 'api-explorer',
+      component: () => import('@/features/api-explorer/ApiExplorerPage.vue'),
+      meta: { title: 'API Explorer · PartsCheck' },
+    },
+    {
+      path: '/stress-test',
+      name: 'stress-test',
       component: () => import('@/features/parts/PartsManagerPage.vue'),
-      meta: { title: 'Parts Manager · PartsCheck' },
+      meta: { title: 'Parts Manager (Stress Test) · PartsCheck' },
     },
   ],
 })
